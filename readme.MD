@@ -121,7 +121,6 @@ A Python-based GUI tool to automate the setup of multiple Laravel projects on Ub
 ## 📌 Notes
 
 - Designed for Ubuntu/Debian only.
-- Works with Laravel 8.x, 9.x, 10.x (and compatible packages).
 - The bulk setup ensures consistent environment configuration for multiple projects.
 
 ---
