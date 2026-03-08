@@ -136,16 +136,6 @@ class LaravelInstallerApp(ctk.CTk):
         self.summary_textbox.pack(fill="x", padx=20, pady=(0, 20))
         self.summary_textbox.configure(state="disabled")
 
-        queue_card = ctk.CTkFrame(self.frame_dashboard, fg_color=COLOR_CARD, corner_radius=15)
-        queue_card.pack(fill="both", expand=True)
-        queue_header = ctk.CTkFrame(queue_card, fg_color="transparent")
-        queue_header.pack(fill="x", padx=20, pady=20)
-        ctk.CTkLabel(queue_header, text="Project Queue", font=("Segoe UI", 16, "bold")).pack(side="left")
-        self.lbl_count = ctk.CTkLabel(queue_header, text="0 Projects", font=("Segoe UI", 13), text_color=COLOR_TEXT_DIM)
-        self.lbl_count.pack(side="left", padx=10)
-        self.queue_container = ctk.CTkScrollableFrame(queue_card, fg_color="transparent", height=300)
-        self.queue_container.pack(fill="both", expand=True, padx=10, pady=(0, 20))
-
         action_bar = ctk.CTkFrame(self.frame_dashboard, fg_color="transparent")
         action_bar.pack(fill="x", pady=20)
         self.btn_run = ctk.CTkButton(
@@ -170,6 +160,16 @@ class LaravelInstallerApp(ctk.CTk):
         )
         self.btn_retry.pack(fill="x", pady=(12, 0))
         self.btn_retry.configure(state="disabled")
+
+        queue_card = ctk.CTkFrame(self.frame_dashboard, fg_color=COLOR_CARD, corner_radius=15)
+        queue_card.pack(fill="both", expand=True)
+        queue_header = ctk.CTkFrame(queue_card, fg_color="transparent")
+        queue_header.pack(fill="x", padx=20, pady=20)
+        ctk.CTkLabel(queue_header, text="Project Queue", font=("Segoe UI", 16, "bold")).pack(side="left")
+        self.lbl_count = ctk.CTkLabel(queue_header, text="0 Projects", font=("Segoe UI", 13), text_color=COLOR_TEXT_DIM)
+        self.lbl_count.pack(side="left", padx=10)
+        self.queue_container = ctk.CTkScrollableFrame(queue_card, fg_color="transparent", height=300)
+        self.queue_container.pack(fill="both", expand=True, padx=10, pady=(0, 20))
 
     def _build_logs(self) -> None:
         self.log_textbox = ctk.CTkTextbox(self.frame_logs, font=("Consolas", 12), fg_color="#111111", text_color="#eeeeee", corner_radius=10)

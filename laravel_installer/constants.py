@@ -2,7 +2,7 @@ from pathlib import Path
 
 APP_NAME = "Laravel Installer"
 APP_SLUG = "laravel-installer"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 COLOR_BG = "#1e1e1e"
 COLOR_SIDEBAR = "#252526"

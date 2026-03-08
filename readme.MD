@@ -42,13 +42,13 @@ Latest packaged release:
 Direct install after download:
 
 ```bash
-sudo apt install ./laravel-installer_1.0.1_amd64.deb
+sudo apt install ./laravel-installer_1.0.2_amd64.deb
 ```
 
 If you are building from this repository instead:
 
 ```bash
-sudo apt install ./build/laravel-installer_1.0.1_amd64.deb
+sudo apt install ./build/laravel-installer_1.0.2_amd64.deb
 ```
 
 ## How It Works
