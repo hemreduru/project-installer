@@ -1,39 +1,88 @@
 # Laravel Installer
 
-Laravel Installer is a desktop application for Ubuntu 22.04 and 24.04 that automates local setup for multiple Laravel projects. It provides a GUI for cloning repositories, preparing `.env`, detecting PHP requirements, installing missing packages, publishing Apache VirtualHosts, updating `/etc/hosts`, and linking each project's `public` directory into `/var/www/html`.
+> Turn a fresh Ubuntu machine into a Laravel-ready local environment in a few clicks.
 
-## What changed
+`Laravel Installer` is a desktop app for Ubuntu that automates the repetitive parts of local Laravel setup: cloning repositories, preparing `.env`, resolving PHP requirements, installing missing packages, wiring Apache VirtualHosts, updating `/etc/hosts`, and publishing each app under `/var/www/html`.
 
-This repository is now structured as a Python package instead of a single-file prototype.
+Built for teams that spin up multiple Laravel projects often and want a cleaner flow than copy-pasting shell commands all day.
 
-- `laravel_installer/ui.py`: `customtkinter` desktop UI
-- `laravel_installer/installer.py`: project install workflow and PHP detection
-- `laravel_installer/system.py`: command execution, environment inspection, privileged helper client
-- `laravel_installer/privileged_helper.py`: fixed-operation helper invoked through `pkexec`
-- `scripts/build_deb.sh`: builds an `amd64 .deb` package with its own venv
-- `tests/`: unit tests for config persistence, PHP version parsing, and helper validation
+## Highlights
 
-## Features
-
-- Queue multiple Laravel projects
-- Optional custom hostname and target directory per project
-- Persist project list and base directory in `~/.config/laravel-installer/config.json`
-- Generate a preparation summary before running installation
-- Automatically detect missing `git`, `composer`, `apache2`, `pkexec`, PHP, PHP-FPM, and Laravel PHP extensions
-- Use `pkexec` for privileged operations instead of collecting sudo password inside the app
+- Desktop GUI built with `customtkinter`
+- Queue multiple Laravel projects in one run
+- Auto-detect required PHP version from `composer.json`
+- Auto-install missing PHP extensions and system dependencies
+- Generate Apache VirtualHosts and local `.test` domains
+- Persist project list and app preferences locally
 - Retry only failed projects after a run
-- Installable from a Debian package with desktop menu integration
+- Ship as an installable `amd64 .deb` package
+- Use `pkexec` for privileged actions instead of asking for sudo inside the app
 
-## Runtime requirements
+## What It Solves
 
-- Ubuntu 22.04 LTS or 24.04 LTS
-- Python 3.10+
-- `python3-tk`
-- Desktop session with Polkit available
-- Network access for Git, Composer, and apt package installation
-- Public Git repositories or already-configured SSH access for private repositories
+Setting up one Laravel project is manageable.
 
-## Development run
+Setting up five projects with different PHP requirements, Apache configs, `/etc/hosts` entries, permissions, Composer dependencies, and public symlinks is the part that gets old fast.
+
+This app turns that setup into a repeatable GUI workflow.
+
+## Supported Platform
+
+- Ubuntu `22.04 LTS`
+- Ubuntu `24.04 LTS`
+- `amd64`
+- Apache-based local environments
+
+## Download
+
+Latest packaged release:
+
+- [GitHub Release: `v1.0.1`](https://github.com/hemreduru/project-installer/releases/tag/v1.0.1)
+
+Direct install after download:
+
+```bash
+sudo apt install ./laravel-installer_1.0.1_amd64.deb
+```
+
+If you are building from this repository instead:
+
+```bash
+sudo apt install ./build/laravel-installer_1.0.1_amd64.deb
+```
+
+## How It Works
+
+For each queued project, Laravel Installer can:
+
+1. Clone the repository or pull the latest changes
+2. Create `.env` from `.env.example` when needed
+3. Detect the PHP version required by `composer.json`
+4. Install missing PHP packages and extensions
+5. Run `composer install`
+6. Link the project's `public` directory into `/var/www/html`
+7. Create an Apache VirtualHost
+8. Add a local host entry such as `project-name.test`
+9. Apply file permissions for local web serving
+
+## Installation
+
+### Option 1: Install the packaged app
+
+```bash
+sudo apt install ./laravel-installer_1.0.1_amd64.deb
+```
+
+Then launch it from:
+
+- your applications menu as `Laravel Installer`
+- or the terminal:
+
+```bash
+laravel-installer
+```
+
+### Option 2: Run in development
 
 ```bash
 python3 -m venv .venv
@@ -42,34 +91,36 @@ pip install -e .
 python3 app.py
 ```
 
-The app will auto-install `customtkinter` and `packaging` if they are missing when started via `python3 app.py`, but an editable install is the cleaner development path.
-
-## Build the Debian package
+## Build The Debian Package
 
 ```bash
 chmod +x scripts/build_deb.sh
 ./scripts/build_deb.sh
 ```
 
-The script builds:
+The build produces:
 
-- a private venv under `/opt/laravel-installer/venv`
 - `/usr/bin/laravel-installer`
 - `/usr/lib/laravel-installer/laravel-installer-helper`
 - desktop entry and icon assets
-- an `amd64 .deb` file under `build/`
+- Polkit policy file
+- a release-ready `.deb` artifact under `build/`
 
-Install the generated package with:
+## Runtime Requirements
 
-```bash
-sudo apt install ./build/laravel-installer_1.0.1_amd64.deb
-```
+- `python3`
+- `python3-tk`
+- `policykit-1`
+- network access for Git, Composer, and apt
+- public repositories or preconfigured SSH access for private ones
 
-## Privileged operation model
+## Security Model
 
-The GUI runs unprivileged. System mutations are delegated to `laravel_installer.privileged_helper` through `pkexec`.
+The GUI itself runs unprivileged.
 
-Supported privileged operations:
+System-changing operations are delegated to a fixed-operation helper through `pkexec`.
+
+Allowed privileged actions:
 
 - `install_packages`
 - `write_vhost`
@@ -79,7 +130,21 @@ Supported privileged operations:
 - `link_public_dir`
 - `set_permissions`
 
-The helper accepts structured JSON payloads only. It does not execute arbitrary shell commands.
+The helper accepts structured JSON payloads only. It does not execute arbitrary shell input.
+
+## Project Layout
+
+```text
+laravel_installer/
+├── ui.py                 # Desktop interface
+├── installer.py          # Laravel setup workflow
+├── system.py             # Command execution and environment inspection
+├── privileged_helper.py  # pkexec-backed privileged operations
+├── config.py             # Local config persistence
+├── templates/            # Apache config template
+├── assets/               # Desktop entry and icon
+└── polkit/               # Polkit policy
+```
 
 ## Tests
 
@@ -90,5 +155,10 @@ python3 -m unittest discover -s tests -v
 ## Notes
 
 - Apache is the only supported web server target in this release.
-- Config data is preserved across upgrades because it lives in the user's home directory.
-- HTTPS token flows are not implemented; repository access assumes public URLs or preconfigured SSH keys.
+- Config is stored under `~/.config/laravel-installer/config.json`.
+- Config survives package upgrades because it lives in the user's home directory.
+- Token-based Git auth flows are not built in yet; private repo access assumes SSH is already configured.
+
+## License
+
+[MIT](LICENSE)
