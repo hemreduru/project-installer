@@ -108,6 +108,9 @@ class PrivilegedOperations:
             raise RuntimeError(summarize_output(completed.stderr or completed.stdout or "Privileged operation failed."))
         return result
 
+    def run_operations(self, operations: list[dict[str, object]]) -> CommandResult:
+        return self.run_operation("run_operations", {"operations": operations})
+
     def install_packages(self, packages: Iterable[str]) -> CommandResult:
         return self.run_operation("install_packages", {"packages": list(packages)})
 
@@ -128,3 +131,12 @@ class PrivilegedOperations:
 
     def set_permissions(self, path: str, username: str) -> CommandResult:
         return self.run_operation("set_permissions", {"path": path, "username": username})
+
+    def ensure_directory_owner(self, path: str, username: str) -> CommandResult:
+        return self.run_operation("ensure_directory_owner", {"path": path, "username": username})
+
+    def configure_apache_php(self, php_version: str) -> CommandResult:
+        return self.run_operation("configure_apache_php", {"php_version": php_version})
+
+    def ensure_service_running(self, service_name: str) -> CommandResult:
+        return self.run_operation("ensure_service_running", {"service_name": service_name})

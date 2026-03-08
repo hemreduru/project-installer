@@ -19,6 +19,22 @@ def run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def run_operations(payload: dict[str, object]) -> None:
+    operations = payload.get("operations", [])
+    if not isinstance(operations, list):
+        raise ValueError("operations must be a list")
+    for item in operations:
+        if not isinstance(item, dict):
+            raise ValueError("each operation must be an object")
+        operation = str(item.get("operation", "")).strip()
+        op_payload = item.get("payload", {})
+        if operation not in OPERATIONS or operation == "run_operations":
+            raise ValueError(f"unsupported batch operation: {operation}")
+        if not isinstance(op_payload, dict):
+            raise ValueError("payload must be an object")
+        OPERATIONS[operation](op_payload)
+
+
 def install_packages(payload: dict[str, object]) -> None:
     packages = payload.get("packages", [])
     if not isinstance(packages, list) or not all(isinstance(item, str) for item in packages):
@@ -47,6 +63,31 @@ def enable_site(payload: dict[str, object]) -> None:
 
 def reload_apache(_: dict[str, object]) -> None:
     run(["systemctl", "reload", "apache2"])
+
+
+def configure_apache_php(payload: dict[str, object]) -> None:
+    php_version = str(payload.get("php_version", "")).strip()
+    if not php_version:
+        raise ValueError("php_version is required")
+
+    modules = ["proxy_fcgi", "setenvif", "rewrite"]
+    for module in modules:
+        run(["a2enmod", module])
+
+    php_fpm_conf = f"php{php_version}-fpm"
+    conf_path = Path("/etc/apache2/conf-available") / f"{php_fpm_conf}.conf"
+    if conf_path.exists():
+        run(["a2enconf", php_fpm_conf])
+
+    run(["systemctl", "enable", "--now", f"php{php_version}-fpm"])
+    run(["systemctl", "enable", "--now", "apache2"])
+
+
+def ensure_service_running(payload: dict[str, object]) -> None:
+    service_name = str(payload.get("service_name", "")).strip()
+    if not service_name or "/" in service_name:
+        raise ValueError("invalid service name")
+    run(["systemctl", "enable", "--now", service_name])
 
 
 def ensure_hosts_entry(payload: dict[str, object]) -> None:
@@ -83,6 +124,16 @@ def set_permissions(payload: dict[str, object]) -> None:
     run(["chown", "-R", f"www-data:{username}", str(path)])
 
 
+def ensure_directory_owner(payload: dict[str, object]) -> None:
+    path = Path(str(payload.get("path", "")))
+    username = str(payload.get("username", "")).strip()
+    if not username:
+        raise ValueError("username is required")
+    path.mkdir(parents=True, exist_ok=True)
+    run(["chown", "-R", f"{username}:{username}", str(path)])
+    run(["chmod", "775", str(path)])
+
+
 OPERATIONS = {
     "install_packages": install_packages,
     "write_vhost": write_vhost,
@@ -91,6 +142,10 @@ OPERATIONS = {
     "ensure_hosts_entry": ensure_hosts_entry,
     "link_public_dir": link_public_dir,
     "set_permissions": set_permissions,
+    "ensure_directory_owner": ensure_directory_owner,
+    "configure_apache_php": configure_apache_php,
+    "ensure_service_running": ensure_service_running,
+    "run_operations": run_operations,
 }
 
 

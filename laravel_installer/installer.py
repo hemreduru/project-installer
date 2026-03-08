@@ -126,6 +126,9 @@ class InstallerService:
     def extension_packages_for_php(self, php_version: str) -> list[str]:
         return [f"php{php_version}-{extension}" for extension in PHP_EXTENSIONS_REQUIRED]
 
+    def base_php_packages_for_version(self, php_version: str) -> list[str]:
+        return [f"php{php_version}", f"php{php_version}-cli", f"php{php_version}-fpm"]
+
     def execute_projects(
         self,
         projects: list[ProjectConfig],
@@ -164,11 +167,32 @@ class InstallerService:
     def _execute_project(self, project: ProjectConfig, execution: ProjectExecution, log_callback) -> None:
         project_dir = Path(project.target_dir)
         html_dir = DEFAULT_HTML_DIR / project.name
+        username = self._current_username()
 
         if not project_dir.exists():
+            if not os.access(project_dir.parent, os.W_OK):
+                self.privileged.run_operations(
+                    [
+                        {
+                            "operation": "ensure_directory_owner",
+                            "payload": {"path": str(project_dir), "username": username},
+                        }
+                    ]
+                )
+                self._record(execution, "prepare_directory", "completed", f"Prepared writable directory {project_dir}")
             result = self.runner.run(["git", "clone", project.repo_url, str(project_dir)])
             self._record(execution, "git_clone", "completed", "Repository cloned.", result.stdout, result.stderr)
         else:
+            if not os.access(project_dir, os.W_OK):
+                self.privileged.run_operations(
+                    [
+                        {
+                            "operation": "ensure_directory_owner",
+                            "payload": {"path": str(project_dir), "username": username},
+                        }
+                    ]
+                )
+                self._record(execution, "prepare_directory", "completed", f"Reclaimed write access to {project_dir}")
             result = self.runner.run(["git", "-C", str(project_dir), "pull"])
             self._record(execution, "git_pull", "completed", "Repository updated.", result.stdout, result.stderr)
         log_callback(f"{project.name}: source ready", "success")
@@ -181,21 +205,32 @@ class InstallerService:
 
         php_version = self.detect_php_version(project_dir / "composer.json")
         installed_versions = self.inspector.installed_php_versions()
-        if php_version not in installed_versions:
-            self.privileged.install_packages([f"php{php_version}", f"php{php_version}-fpm", *self.extension_packages_for_php(php_version)])
+        required_php_packages = [
+            *self.base_php_packages_for_version(php_version),
+            *self.extension_packages_for_php(php_version),
+        ]
+        missing_php_packages = [
+            package for package in required_php_packages
+            if not Path("/usr/bin/dpkg-query").exists() or self._is_package_missing(package)
+        ]
+        php_batch_ops: list[dict[str, object]] = []
+        if php_version not in installed_versions or missing_php_packages:
+            php_batch_ops.append(
+                {
+                    "operation": "install_packages",
+                    "payload": {"packages": missing_php_packages or required_php_packages},
+                }
+            )
+            self._record(execution, "php_packages", "completed", f"Installed PHP runtime packages for {php_version}")
             installed_versions = self.inspector.installed_php_versions()
-        else:
-            missing_extensions = [
-                package for package in self.extension_packages_for_php(php_version)
-                if not Path("/usr/bin/dpkg-query").exists() or self._is_package_missing(package)
-            ]
-            if missing_extensions:
-                self.privileged.install_packages(missing_extensions)
+        php_batch_ops.append({"operation": "configure_apache_php", "payload": {"php_version": php_version}})
+        self.privileged.run_operations(php_batch_ops)
         self._record(execution, "php", "completed", f"Using PHP {php_version}")
+        self._record(execution, "apache_php", "completed", f"Configured Apache for PHP {php_version}")
 
         php_bin = shutil.which(f"php{php_version}") or f"/usr/bin/php{php_version}"
         composer_bin = shutil.which("composer") or "/usr/bin/composer"
-        result = self.runner.run([php_bin, composer_bin, "install", "-d", str(project_dir)])
+        result = self.runner.run([php_bin, composer_bin, "install", "--working-dir", str(project_dir)])
         self._record(
             execution,
             "composer",
@@ -207,12 +242,44 @@ class InstallerService:
         log_callback(f"{project.name}: composer install finished", "success")
 
         vhost = self.render_vhost(project.hostname, html_dir, php_version)
-        self.privileged.link_public_dir(str(project_dir / "public"), str(html_dir))
-        self.privileged.set_permissions(str(project_dir), self._current_username())
-        self.privileged.ensure_hosts_entry(project.hostname)
-        self.privileged.write_vhost(project.name, vhost)
-        self.privileged.enable_site(project.name)
-        self.privileged.reload_apache()
+        self.privileged.run_operations(
+            [
+                {
+                    "operation": "link_public_dir",
+                    "payload": {"source": str(project_dir / "public"), "destination": str(html_dir)},
+                },
+                {
+                    "operation": "set_permissions",
+                    "payload": {"path": str(project_dir), "username": username},
+                },
+                {
+                    "operation": "ensure_hosts_entry",
+                    "payload": {"hostname": project.hostname},
+                },
+                {
+                    "operation": "write_vhost",
+                    "payload": {"site_name": project.name, "content": vhost},
+                },
+                {
+                    "operation": "enable_site",
+                    "payload": {"site_name": project.name},
+                },
+                {
+                    "operation": "ensure_service_running",
+                    "payload": {"service_name": "apache2"},
+                },
+                {
+                    "operation": "reload_apache",
+                    "payload": {},
+                },
+            ]
+        )
+        self._record(execution, "public_link", "completed", f"Linked {html_dir} to project public directory")
+        self._record(execution, "permissions", "completed", f"Updated permissions for {project_dir}")
+        self._record(execution, "hosts", "completed", f"Added hosts entry for {project.hostname}")
+        self._record(execution, "vhost", "completed", f"Wrote Apache site {project.name}.conf")
+        self._record(execution, "site_enable", "completed", f"Enabled Apache site {project.name}")
+        self._record(execution, "apache_reload", "completed", "Reloaded Apache")
         self._record(execution, "publish", "completed", f"Published at http://{project.hostname}")
         log_callback(f"{project.name}: published at http://{project.hostname}", "success")
 

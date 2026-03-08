@@ -65,7 +65,7 @@ class LaravelInstallerApp(ctk.CTk):
         self.content_area = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.content_area.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
-        self.frame_dashboard = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        self.frame_dashboard = ctk.CTkScrollableFrame(self.content_area, fg_color="transparent")
         self.frame_logs = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
         self._build_sidebar()
@@ -168,6 +168,16 @@ class LaravelInstallerApp(ctk.CTk):
         ctk.CTkLabel(queue_header, text="Project Queue", font=("Segoe UI", 16, "bold")).pack(side="left")
         self.lbl_count = ctk.CTkLabel(queue_header, text="0 Projects", font=("Segoe UI", 13), text_color=COLOR_TEXT_DIM)
         self.lbl_count.pack(side="left", padx=10)
+        self.btn_clear_queue = ctk.CTkButton(
+            queue_header,
+            text="Clear Queue",
+            width=110,
+            height=32,
+            fg_color=COLOR_DANGER,
+            hover_color="#dc2626",
+            command=self.clear_queue,
+        )
+        self.btn_clear_queue.pack(side="right")
         self.queue_container = ctk.CTkScrollableFrame(queue_card, fg_color="transparent", height=300)
         self.queue_container.pack(fill="both", expand=True, padx=10, pady=(0, 20))
 
@@ -241,10 +251,21 @@ class LaravelInstallerApp(ctk.CTk):
         self.refresh_queue_ui()
         self.refresh_summary()
 
+    def clear_queue(self) -> None:
+        if not self._current_projects():
+            return
+        self.config_state.projects.clear()
+        self.project_runs = []
+        self.persist_config()
+        self.refresh_queue_ui()
+        self.refresh_summary()
+
     def refresh_queue_ui(self) -> None:
         for widget in self.queue_container.winfo_children():
             widget.destroy()
-        self.lbl_count.configure(text=f"{len(self._current_projects())} Projects")
+        project_count = len(self._current_projects())
+        self.lbl_count.configure(text=f"{project_count} Projects")
+        self.btn_clear_queue.configure(state="normal" if project_count else "disabled")
         for idx, project in enumerate(self._current_projects()):
             row = ctk.CTkFrame(self.queue_container, fg_color="#333333", height=56)
             row.pack(fill="x", pady=2)

@@ -9,6 +9,8 @@
   <action id="com.emre.laravel-installer.helper">
     <description>Run privileged Laravel Installer tasks</description>
     <message>Authentication is required to modify local web server settings.</message>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/laravel-installer/laravel-installer-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>
