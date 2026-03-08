@@ -1,0 +1,16 @@
+# Python cache and packaging artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local environments
+.venv/
+venv/
+
+# Build outputs
+build/
+dist/
+
+# IDE and OS files
+.DS_Store

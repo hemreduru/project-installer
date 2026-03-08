@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Laravel Installer
+GenericName=Laravel Project Installer
+Comment=Install Laravel projects locally on Ubuntu
+Exec=/usr/bin/laravel-installer
+Icon=laravel-installer
+Categories=Development;
+Terminal=false
+StartupNotify=true

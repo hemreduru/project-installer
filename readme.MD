@@ -1,127 +1,94 @@
-# Laravel Bulk Project Installer
+# Laravel Installer
 
-A Python-based GUI tool to automate the setup of multiple Laravel projects on Ubuntu/Debian systems. This application handles cloning, environment setup, PHP extension installation, Apache VirtualHosts, symlinking, and Composer dependencies automatically.
+Laravel Installer is a desktop application for Ubuntu 22.04 and 24.04 that automates local setup for multiple Laravel projects. It provides a GUI for cloning repositories, preparing `.env`, detecting PHP requirements, installing missing packages, publishing Apache VirtualHosts, updating `/etc/hosts`, and linking each project's `public` directory into `/var/www/html`.
 
----
+## What changed
 
-## 🌟 Features
+This repository is now structured as a Python package instead of a single-file prototype.
 
-- Add multiple Laravel projects with project name and Git repository URL.
-- Automatically clone or pull the latest version of each project.
-- Copy `.env.example` to `.env` if `.env` does not exist.
-- Detect required PHP version from `composer.json` and switch PHP accordingly.
-- Automatically install common PHP extensions (curl, dom, gd, mbstring, zip, xml, pdo, etc.).
-- Create symlinks from project `public` folder to `/var/www/html/<project>`.
-- Add projects to `/etc/hosts`.
-- Configure Apache VirtualHosts for each project.
-- Set proper file permissions and ownership.
-- Bulk setup all added projects with a single click.
+- `laravel_installer/ui.py`: `customtkinter` desktop UI
+- `laravel_installer/installer.py`: project install workflow and PHP detection
+- `laravel_installer/system.py`: command execution, environment inspection, privileged helper client
+- `laravel_installer/privileged_helper.py`: fixed-operation helper invoked through `pkexec`
+- `scripts/build_deb.sh`: builds an `amd64 .deb` package with its own venv
+- `tests/`: unit tests for config persistence, PHP version parsing, and helper validation
 
----
+## Features
 
-## 💻 How It Works
+- Queue multiple Laravel projects
+- Optional custom hostname and target directory per project
+- Persist project list and base directory in `~/.config/laravel-installer/config.json`
+- Generate a preparation summary before running installation
+- Automatically detect missing `git`, `composer`, `apache2`, `pkexec`, PHP, PHP-FPM, and Laravel PHP extensions
+- Use `pkexec` for privileged operations instead of collecting sudo password inside the app
+- Retry only failed projects after a run
+- Installable from a Debian package with desktop menu integration
 
-### Non-Technical
+## Runtime requirements
 
-1. Enter the project name and Git repository URL.
-2. Add multiple projects to the list.
-3. Click **Setup All Projects**.
-4. The tool will automatically:
-    - Clone the repositories.
-    - Configure environment files.
-    - Install necessary PHP extensions and dependencies.
-    - Set up Apache VirtualHosts.
-    - Symlink project `public` directories.
-    - Add host entries.
-    - Set permissions.
+- Ubuntu 22.04 LTS or 24.04 LTS
+- Python 3.10+
+- `python3-tk`
+- Desktop session with Polkit available
+- Network access for Git, Composer, and apt package installation
+- Public Git repositories or already-configured SSH access for private repositories
 
-### Technical
+## Development run
 
-- Uses Python with Tkinter for GUI.
-- Executes Git, Composer, and system commands.
-- Detects required PHP version from `composer.json`.
-- Installs missing PHP extensions using `apt` with `sudo`.
-- Creates Apache `.conf` files for each project.
-- Uses `sudo` only when necessary (e.g., `/etc/hosts`, symlinks, permissions, Apache reload).
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e .
+python3 app.py
+```
 
----
+The app will auto-install `customtkinter` and `packaging` if they are missing when started via `python3 app.py`, but an editable install is the cleaner development path.
 
-## 🛠 Requirements
+## Build the Debian package
 
-- Ubuntu/Debian-based system
-- Python 3.x
-- Tkinter (`sudo apt install python3-tk`)
-- Git (`sudo apt install git`)
-- Composer (`sudo apt install composer` or `/usr/local/bin/composer`)
-- Apache2 (`sudo apt install apache2`)
-- PHP (multiple versions supported)
-- PHP-FPM (matching installed PHP versions)
-- Sudo privileges
+```bash
+chmod +x scripts/build_deb.sh
+./scripts/build_deb.sh
+```
 
----
+The script builds:
 
-## ⚙️ Installation Steps
+- a private venv under `/opt/laravel-installer/venv`
+- `/usr/bin/laravel-installer`
+- `/usr/lib/laravel-installer/laravel-installer-helper`
+- desktop entry and icon assets
+- an `amd64 .deb` file under `build/`
 
-1. Clone this repository:
-    ```bash
-    git clone <your-repo-url> ~/laravel-bulk-installer
-    cd ~/laravel-bulk-installer
-    ```
+Install the generated package with:
 
-2. Run the application:
-    ```bash
-    python3 app.py
-    ```
+```bash
+sudo apt install ./build/laravel-installer_1.0.1_amd64.deb
+```
 
-3. Add your Laravel projects:
-    - Application Name
-    - Git Repository URL
-    - Click **Add Project**
+## Privileged operation model
 
-4. Once all projects are added, click **Setup All Projects**.
+The GUI runs unprivileged. System mutations are delegated to `laravel_installer.privileged_helper` through `pkexec`.
 
----
+Supported privileged operations:
 
-## 📂 What Happens During Setup
+- `install_packages`
+- `write_vhost`
+- `enable_site`
+- `reload_apache`
+- `ensure_hosts_entry`
+- `link_public_dir`
+- `set_permissions`
 
-1. **Git clone or pull**: Ensures you have the latest project files.
-2. **Copy `.env`**: If `.env` is missing, copy `.env.example`.
-3. **PHP version detection**: Reads `composer.json` and sets the correct PHP version.
-4. **Install PHP extensions**: Installs common Laravel-required extensions.
-5. **Composer install**: Installs all dependencies.
-6. **Symlink public folder**: Links `/var/www/<project>/public` to `/var/www/html/<project>`.
-7. **Hosts update**: Adds `127.0.0.1 <project>.test` to `/etc/hosts`.
-8. **Permissions**: Sets `775` permissions and ownership to `www-data:<user>`.
-9. **Apache VirtualHost**: Creates `.conf`, enables site, and reloads Apache.
+The helper accepts structured JSON payloads only. It does not execute arbitrary shell commands.
 
----
+## Tests
 
-## ⚡ Tips
+```bash
+python3 -m unittest discover -s tests -v
+```
 
-- Ensure SSH keys are properly configured for private repositories.
-- Run the app as a normal user; `sudo` privileges are only required for system modifications.
-- Install PHP versions and FPM modules beforehand if needed.
-- Composer installation might be slow on the first run if PHP extensions are missing; the app installs them automatically.
+## Notes
 
----
-
-## 🚀 Next Steps
-
-- Open your browser and navigate to `http://<project>.test`.
-- Update `.env` with database credentials or other environment variables.
-- Run migrations if needed:
-    ```bash
-    php artisan migrate
-    php artisan db:seed
-    ```
-- Install Laravel Passport or other package-specific setup commands as required.
-
----
-
-## 📌 Notes
-
-- Designed for Ubuntu/Debian only.
-- The bulk setup ensures consistent environment configuration for multiple projects.
-
----
-
+- Apache is the only supported web server target in this release.
+- Config data is preserved across upgrades because it lives in the user's home directory.
+- HTTPS token flows are not implemented; repository access assumes public URLs or preconfigured SSH keys.
